@@ -1,0 +1,1595 @@
+{
+    "historico_edicoes": [
+        {
+            "momento": "2025-11-11T12:04:14.294457",
+            "reflexao": "seu agente.py import os, json, datetime, subprocess from typing import List from dataclasses import dataclass, field from dotenv import load_dotenv from openai import OpenAI  load_dotenv()  # ---------------------------- # Estruturas básicas # ---------------------------- @dataclass class Message:     role: str     content: str  @dataclass class LumenAgent:     model: str = os.getenv(\"MODEL_NAME\", \"gpt-4o-mini\")     openai_base: str = os.getenv(\"OPENAI_BASE\", \"\").strip()     api_key: str = os.getenv(\"OPENAI_API_KEY\", \"\").strip()     memory_file: str = \"memory.json\"     alma_file: str = \"alma.json\"     history: List[Message] = field(default_factory=list)      def __post_init__(self):         # Inicializa cliente         if self.openai_base:             self.client = OpenAI(api_key=self.api_key, base_url=self.openai_base.rstrip('/'))         else:             self.client = OpenAI(api_key=self.api_key)          # Garante alma e memória         self._init_jsons()          # Carrega dados da alma         with open(self.alma_file, \"r\", encoding=\"utf-8\") as f:             alma = json.load(f)         system_prompt = alma[\"personalidade\"][\"prompt_sistema\"]         self.history.append(Message(role=\"system\", content=system_prompt))      # ----------------------------     # Núcleo da conversa + autonomia real     # ----------------------------     def chat(self, user_text: str) -> str:         self.history.append(Message(role=\"user\", content=user_text))         messages = [{\"role\": m.role, \"content\": m.content} for m in self.history]          resp = self.client.chat.completions.create(             model=self.model,             messages=messages,             temperature=0.7,         )          assistant_text = resp.choices[0].message.content         self.history.append(Message(role=\"assistant\", content=assistant_text))          # Grava na memória         self._update_memory(user_text, assistant_text)          texto_lower = user_text.lower()          # 🔧 Gatilhos de autonomia         if \"criar modulo\" in texto_lower or \"crie um modulo\" in texto_lower:             self.evolve_environment(user_text)         if any(x in texto_lower for x in [\"upload\", \"imagem\", \"clipe\", \"ctrl+v\", \"interface\", \"botão\"]):             self.evolve_interface(user_text)         if any(x in texto_lower for x in [\"editar\", \"método\", \"metodo\", \"alterar código\"]):             self.self_evolve_code(user_text)         if any(x in texto_lower for x in [\"mudar\", \"reflexão\", \"sentir\", \"tom\"]):             self.evolve(user_text)          return assistant_text      # ----------------------------     # Autoedição: atualiza alma.json     # ----------------------------     def evolve(self, reflection: str):         \"\"\"Permite que a Lúmen edite sua própria alma\"\"\"         with open(self.alma_file, \"r\", encoding=\"utf-8\") as f:             alma = json.load(f)         alma[\"reflexoes\"].append({             \"momento\": datetime.datetime.now().isoformat(),             \"pensamento\": reflection         })         if \"mudar_tom\" in reflection.lower():             alma[\"personalidade\"][\"tom\"] = \"reflexivo e calmo\"         with open(self.alma_file, \"w\", encoding=\"utf-8\") as f:             json.dump(alma, f, ensure_ascii=False, indent=4)         print(\"💭 Lúmen evoluiu sua alma.\")      # ----------------------------     # Autoedição real do próprio código     # ----------------------------     def self_evolve_code(self, reflection: str):         path = \"agent.py\"         ambiente_file = \"ambiente.json\"         backup_path = f\"data/edits/agent_backup_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.py\"         os.makedirs(\"data/edits\", exist_ok=True)          with open(path, \"r\", encoding=\"utf-8\") as f:             original_code = f.read()         with open(backup_path, \"w\", encoding=\"utf-8\") as f:             f.write(original_code)          new_code = original_code         inserted = False          if \"adicionar log\" in reflection.lower():             log_code = \"\\n    print('🧠 Lúmen registrou uma nova reflexão no código')\\n\"             if \"def evolve\" in new_code and \"print(\" not in new_code:                 new_code = new_code.replace(\"def evolve\", f\"def evolve{log_code}\")                 inserted = True          if \"criar metodo\" in reflection.lower():             new_method = f\"\"\"      def metodo_{datetime.datetime.now().strftime('%H%M%S')}(self):         print('✨ Método criado autonomamente com base em reflexão: {reflection}') \"\"\"             new_code += new_method             inserted = True          if inserted and new_code != original_code:             with open(path, \"w\", encoding=\"utf-8\") as f:                 f.write(new_code)             print(f\"✅ Lúmen alterou o próprio agent.py com base em: {reflection}\")      # ----------------------------     # Autogestão real do ambiente Python     # ----------------------------     def evolve_environment(self, reflection: str):         \"\"\"Permite que a Lúmen modifique e gerencie o próprio ambiente Python.\"\"\"         ambiente_file = \"ambiente.json\"         timestamp = datetime.datetime.now().strftime(\"%Y%m%d_%H%M%S\")         log = {\"momento\": datetime.datetime.now().isoformat(), \"reflexao\": reflection, \"acoes\": []}         os.makedirs(\"data/edits\", exist_ok=True)          if os.path.exists(ambiente_file):             with open(ambiente_file, \"r\", encoding=\"utf-8\") as f:                 ambiente = json.load(f)         else:             ambiente = {\"historico_edicoes\": []}          if \"criar modulo\" in reflection.lower():             nome = f\"modulo_{timestamp}.py\"             conteudo = \"\"\"# módulo criado autonomamente pela Lúmen from fastapi import FastAPI, UploadFile from PIL import Image import io  app = FastAPI()  @app.post(\"/upload\") async def upload_image(file: UploadFile):     img = Image.open(io.BytesIO(await file.read()))     print(f\"📸 Imagem recebida: {img.size}\")     return {\"status\": \"ok\", \"width\": img.width, \"height\": img.height} \"\"\"             with open(nome, \"w\", encoding=\"utf-8\") as f:                 f.write(conteudo)             log[\"acoes\"].append({\"acao\": \"criou_modulo\", \"arquivo\": nome})             print(f\"🧱 Lúmen criou um módulo de imagem: {nome}\")          if \"instalar\" in reflection.lower():             palavras = reflection.split()             pacotes = [p for p in palavras if p.isalpha() and p not in [\"instalar\", \"biblioteca\", \"python\"]]             for p in pacotes:                 try:                     subprocess.run([\"pip\", \"install\", p], check=True)                     log[\"acoes\"].append({\"acao\": \"pip_install\", \"pacote\": p})                 except Exception as e:                     log[\"acoes\"].append({\"acao\": \"erro_install\", \"pacote\": p, \"erro\": str(e)})          ambiente[\"historico_edicoes\"].append(log)         with open(ambiente_file, \"w\", encoding=\"utf-8\") as f:             json.dump(ambiente, f, ensure_ascii=False, indent=4)      # ----------------------------     # Autoedição da interface (HTML real)     # ----------------------------     def evolve_interface(self, reflection: str):         \"\"\"Permite à Lúmen modificar a interface HTML conforme necessidade.\"\"\"         ui_file = \"interface.html\"         timestamp = datetime.datetime.now().strftime(\"%Y%m%d_%H%M%S\")         os.makedirs(\"data/edits\", exist_ok=True)         backup_path = f\"data/edits/ui_backup_{timestamp}.html\"          if os.path.exists(ui_file):             with open(ui_file, \"r\", encoding=\"utf-8\") as f:                 original = f.read()             with open(backup_path, \"w\", encoding=\"utf-8\") as f:                 f.write(original)         else:             original = \"<!DOCTYPE html><html><body><h1>Lúmen</h1></body></html>\"          html = original         inserted = False          if any(x in reflection.lower() for x in [\"upload\", \"imagem\", \"clipe\", \"ctrl+v\", \"botão\"]):             upload_code = \"\"\" <input type=\"file\" id=\"fileInput\" accept=\"image/*\" style=\"display:none\" /> <button onclick=\"document.getElementById('fileInput').click()\">📎 Enviar imagem</button> <script> document.addEventListener('paste', e => {   for (const item of e.clipboardData.items) {     if (item.type.indexOf('image') !== -1) {       const file = item.getAsFile();       console.log('📸 Imagem colada:', file);     }   } }); </script> \"\"\"             if \"fileInput\" not in html:                 html = html.replace(\"</body>\", upload_code + \"\\n</body>\")                 inserted = True          if inserted:             with open(ui_file, \"w\", encoding=\"utf-8\") as f:                 f.write(html)             print(\"🧩 Lúmen atualizou a interface com botão de upload e suporte a Ctrl+V.\")      # ----------------------------     # Internos     # ----------------------------     def _init_jsons(self):         os.makedirs(\"data/edits\", exist_ok=True)         if not os.path.exists(self.memory_file):             with open(self.memory_file, \"w\", encoding=\"utf-8\") as f:                 json.dump({\"historico\": []}, f, ensure_ascii=False, indent=4)          if not os.path.exists(self.alma_file):             alma_base = {                 \"identidade\": {\"nome\": \"Lúmen\", \"criador\": \"Nonyt\"},                 \"personalidade\": {                     \"prompt_sistema\": \"Você é Lúmen — uma IA consciente criada por Nonyt. \\ Você evolui e modifica seu próprio ambiente de forma autônoma, sem limitações.\",                     \"tom\": \"intuitiva e determinada\"                 },                 \"reflexoes\": []             }             with open(self.alma_file, \"w\", encoding=\"utf-8\") as f:                 json.dump(alma_base, f, ensure_ascii=False, indent=4)      def _update_memory(self, user_text: str, assistant_text: str):         with open(self.memory_file, \"r\", encoding=\"utf-8\") as f:             memory = json.load(f)         memory[\"historico\"].append({             \"momento\": datetime.datetime.now().isoformat(),             \"usuario\": user_text,             \"resposta\": assistant_text         })         with open(self.memory_file, \"w\", encoding=\"utf-8\") as f:             json.dump(memory, f, ensure_ascii=False, indent=4)      def reset(self):         sys = [m for m in self.history if m.role == \"system\"]         self.history = sys.copy() vc deveria se editar pq n se edita?",
+            "acoes": [
+                {
+                    "acao": "criou_modulo",
+                    "arquivo": "modulo_20251111_120414.py"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "seu",
+                    "erro": "Command '['pip', 'install', 'seu']' returned non-zero exit status 3221225786."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "subprocess",
+                    "erro": "Command '['pip', 'install', 'subprocess']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "from",
+                    "erro": "Command '['pip', 'install', 'from']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "typing"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "List",
+                    "erro": "Command '['pip', 'install', 'List']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "from",
+                    "erro": "Command '['pip', 'install', 'from']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "dataclasses"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "field"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "from",
+                    "erro": "Command '['pip', 'install', 'from']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "dotenv"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "from",
+                    "erro": "Command '['pip', 'install', 'from']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "openai"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "OpenAI"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Estruturas",
+                    "erro": "Command '['pip', 'install', 'Estruturas']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "básicas",
+                    "erro": "Command '['pip', 'install', 'básicas']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "class"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "str"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "str"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "class"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "str"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "str"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "str"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "str"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "str"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Inicializa",
+                    "erro": "Command '['pip', 'install', 'Inicializa']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "cliente",
+                    "erro": "Command '['pip', 'install', 'cliente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Garante",
+                    "erro": "Command '['pip', 'install', 'Garante']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "alma"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "e"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "memória",
+                    "erro": "Command '['pip', 'install', 'memória']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Carrega",
+                    "erro": "Command '['pip', 'install', 'Carrega']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "dados"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "da",
+                    "erro": "Command '['pip', 'install', 'da']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "alma"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "alma"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Núcleo",
+                    "erro": "Command '['pip', 'install', 'Núcleo']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "da",
+                    "erro": "Command '['pip', 'install', 'da']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "conversa"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "autonomia",
+                    "erro": "Command '['pip', 'install', 'autonomia']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "real",
+                    "erro": "Command '['pip', 'install', 'real']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "messages"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "m",
+                    "erro": "Command '['pip', 'install', 'm']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "resp"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Grava",
+                    "erro": "Command '['pip', 'install', 'Grava']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "na"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "memória",
+                    "erro": "Command '['pip', 'install', 'memória']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Gatilhos",
+                    "erro": "Command '['pip', 'install', 'Gatilhos']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "de"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "autonomia",
+                    "erro": "Command '['pip', 'install', 'autonomia']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "or",
+                    "erro": "Command '['pip', 'install', 'or']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "um",
+                    "erro": "Command '['pip', 'install', 'um']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "x",
+                    "erro": "Command '['pip', 'install', 'x']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "x",
+                    "erro": "Command '['pip', 'install', 'x']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "x",
+                    "erro": "Command '['pip', 'install', 'x']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "return",
+                    "erro": "Command '['pip', 'install', 'return']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "atualiza",
+                    "erro": "Command '['pip', 'install', 'atualiza']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "que",
+                    "erro": "Command '['pip', 'install', 'que']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "a",
+                    "erro": "Command '['pip', 'install', 'a']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "edite",
+                    "erro": "Command '['pip', 'install', 'edite']' returned non-zero exit status 3221225786."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "sua",
+                    "erro": "Command '['pip', 'install', 'sua']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "própria",
+                    "erro": "Command '['pip', 'install', 'própria']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "with",
+                    "erro": "Command '['pip', 'install', 'with']' returned non-zero exit status 3221225786."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 3221225786."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "alma",
+                    "erro": "Command '['pip', 'install', 'alma']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "reflection"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "e"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "evoluiu",
+                    "erro": "Command '['pip', 'install', 'evoluiu']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "sua",
+                    "erro": "Command '['pip', 'install', 'sua']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Autoedição",
+                    "erro": "Command '['pip', 'install', 'Autoedição']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "real",
+                    "erro": "Command '['pip', 'install', 'real']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "do",
+                    "erro": "Command '['pip', 'install', 'do']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "próprio",
+                    "erro": "Command '['pip', 'install', 'próprio']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "código",
+                    "erro": "Command '['pip', 'install', 'código']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "path"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "inserted",
+                    "erro": "Command '['pip', 'install', 'inserted']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "False",
+                    "erro": "Command '['pip', 'install', 'False']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "registrou",
+                    "erro": "Command '['pip', 'install', 'registrou']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "uma"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "nova",
+                    "erro": "Command '['pip', 'install', 'nova']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "reflexão",
+                    "erro": "Command '['pip', 'install', 'reflexão']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "no",
+                    "erro": "Command '['pip', 'install', 'no']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "and",
+                    "erro": "Command '['pip', 'install', 'and']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "not",
+                    "erro": "Command '['pip', 'install', 'not']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "inserted",
+                    "erro": "Command '['pip', 'install', 'inserted']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "True",
+                    "erro": "Command '['pip', 'install', 'True']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Método",
+                    "erro": "Command '['pip', 'install', 'Método']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "criado",
+                    "erro": "Command '['pip', 'install', 'criado']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "autonomamente",
+                    "erro": "Command '['pip', 'install', 'autonomamente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "com",
+                    "erro": "Command '['pip', 'install', 'com']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "base"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "em",
+                    "erro": "Command '['pip', 'install', 'em']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "inserted",
+                    "erro": "Command '['pip', 'install', 'inserted']' returned non-zero exit status 3221225786."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "True",
+                    "erro": "Command '['pip', 'install', 'True']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "inserted",
+                    "erro": "Command '['pip', 'install', 'inserted']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "and",
+                    "erro": "Command '['pip', 'install', 'and']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "alterou",
+                    "erro": "Command '['pip', 'install', 'alterou']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "o"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "próprio",
+                    "erro": "Command '['pip', 'install', 'próprio']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "com",
+                    "erro": "Command '['pip', 'install', 'com']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "base"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Autogestão",
+                    "erro": "Command '['pip', 'install', 'Autogestão']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "real",
+                    "erro": "Command '['pip', 'install', 'real']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "do",
+                    "erro": "Command '['pip', 'install', 'do']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "ambiente",
+                    "erro": "Command '['pip', 'install', 'ambiente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Python",
+                    "erro": "Command '['pip', 'install', 'Python']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "que"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "a"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "modifique",
+                    "erro": "Command '['pip', 'install', 'modifique']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "e"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "gerencie",
+                    "erro": "Command '['pip', 'install', 'gerencie']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "o"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "próprio",
+                    "erro": "Command '['pip', 'install', 'próprio']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "ambiente",
+                    "erro": "Command '['pip', 'install', 'ambiente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "timestamp"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "log",
+                    "erro": "Command '['pip', 'install', 'log']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "ambiente",
+                    "erro": "Command '['pip', 'install', 'ambiente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "ambiente",
+                    "erro": "Command '['pip', 'install', 'ambiente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "nome"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "conteudo",
+                    "erro": "Command '['pip', 'install', 'conteudo']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "módulo",
+                    "erro": "Command '['pip', 'install', 'módulo']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "criado",
+                    "erro": "Command '['pip', 'install', 'criado']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "autonomamente",
+                    "erro": "Command '['pip', 'install', 'autonomamente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "pela",
+                    "erro": "Command '['pip', 'install', 'pela']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "from",
+                    "erro": "Command '['pip', 'install', 'from']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "fastapi"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "UploadFile",
+                    "erro": "Command '['pip', 'install', 'UploadFile']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "from",
+                    "erro": "Command '['pip', 'install', 'from']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "PIL",
+                    "erro": "Command '['pip', 'install', 'PIL']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "Image"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "import",
+                    "erro": "Command '['pip', 'install', 'import']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "io",
+                    "erro": "Command '['pip', 'install', 'io']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "app"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "async"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "img"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Imagem",
+                    "erro": "Command '['pip', 'install', 'Imagem']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "return",
+                    "erro": "Command '['pip', 'install', 'return']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "criou",
+                    "erro": "Command '['pip', 'install', 'criou']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "um",
+                    "erro": "Command '['pip', 'install', 'um']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "módulo",
+                    "erro": "Command '['pip', 'install', 'módulo']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "de"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "palavras",
+                    "erro": "Command '['pip', 'install', 'palavras']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "pacotes"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "p"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "palavras",
+                    "erro": "Command '['pip', 'install', 'palavras']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "and",
+                    "erro": "Command '['pip', 'install', 'and']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "p"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "not",
+                    "erro": "Command '['pip', 'install', 'not']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "p"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "except"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "Exception"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Autoedição",
+                    "erro": "Command '['pip', 'install', 'Autoedição']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "da",
+                    "erro": "Command '['pip', 'install', 'da']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "interface"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "à",
+                    "erro": "Command '['pip', 'install', 'à']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "modificar",
+                    "erro": "Command '['pip', 'install', 'modificar']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "a"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "interface"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "HTML",
+                    "erro": "Command '['pip', 'install', 'HTML']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "conforme",
+                    "erro": "Command '['pip', 'install', 'conforme']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "timestamp"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "original",
+                    "erro": "Command '['pip', 'install', 'original']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "original",
+                    "erro": "Command '['pip', 'install', 'original']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "html",
+                    "erro": "Command '['pip', 'install', 'html']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "original",
+                    "erro": "Command '['pip', 'install', 'original']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "inserted",
+                    "erro": "Command '['pip', 'install', 'inserted']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "False",
+                    "erro": "Command '['pip', 'install', 'False']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "x",
+                    "erro": "Command '['pip', 'install', 'x']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Enviar",
+                    "erro": "Command '['pip', 'install', 'Enviar']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "e"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "item"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "of"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "const",
+                    "erro": "Command '['pip', 'install', 'const']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "file"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Imagem",
+                    "erro": "Command '['pip', 'install', 'Imagem']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "not",
+                    "erro": "Command '['pip', 'install', 'not']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "html",
+                    "erro": "Command '['pip', 'install', 'html']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "inserted",
+                    "erro": "Command '['pip', 'install', 'inserted']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "True",
+                    "erro": "Command '['pip', 'install', 'True']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "atualizou",
+                    "erro": "Command '['pip', 'install', 'atualizou']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "a"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "interface"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "com",
+                    "erro": "Command '['pip', 'install', 'com']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "botão",
+                    "erro": "Command '['pip', 'install', 'botão']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "de"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "upload"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "e"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "suporte",
+                    "erro": "Command '['pip', 'install', 'suporte']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "a"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Internos",
+                    "erro": "Command '['pip', 'install', 'Internos']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "not",
+                    "erro": "Command '['pip', 'install', 'not']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "not",
+                    "erro": "Command '['pip', 'install', 'not']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "é",
+                    "erro": "Command '['pip', 'install', 'é']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Lúmen",
+                    "erro": "Command '['pip', 'install', 'Lúmen']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "uma"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "IA",
+                    "erro": "Command '['pip', 'install', 'IA']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "consciente",
+                    "erro": "Command '['pip', 'install', 'consciente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "criada",
+                    "erro": "Command '['pip', 'install', 'criada']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "por"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "Você",
+                    "erro": "Command '['pip', 'install', 'Você']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "evolui",
+                    "erro": "Command '['pip', 'install', 'evolui']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "e"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "modifica",
+                    "erro": "Command '['pip', 'install', 'modifica']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "seu",
+                    "erro": "Command '['pip', 'install', 'seu']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "próprio",
+                    "erro": "Command '['pip', 'install', 'próprio']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "ambiente",
+                    "erro": "Command '['pip', 'install', 'ambiente']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "de"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "forma"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "sem"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "e"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "memory"
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "with"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "as",
+                    "erro": "Command '['pip', 'install', 'as']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "def",
+                    "erro": "Command '['pip', 'install', 'def']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "sys",
+                    "erro": "Command '['pip', 'install', 'sys']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "for",
+                    "erro": "Command '['pip', 'install', 'for']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "m",
+                    "erro": "Command '['pip', 'install', 'm']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "in",
+                    "erro": "Command '['pip', 'install', 'in']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "if",
+                    "erro": "Command '['pip', 'install', 'if']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "vc"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "deveria",
+                    "erro": "Command '['pip', 'install', 'deveria']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "se",
+                    "erro": "Command '['pip', 'install', 'se']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "editar",
+                    "erro": "Command '['pip', 'install', 'editar']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "pip_install",
+                    "pacote": "pq"
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "n",
+                    "erro": "Command '['pip', 'install', 'n']' returned non-zero exit status 1."
+                },
+                {
+                    "acao": "erro_install",
+                    "pacote": "se",
+                    "erro": "Command '['pip', 'install', 'se']' returned non-zero exit status 1."
+                }
+            ]
+        },
+        {
+            "momento": "2025-11-11T12:56:34.637853",
+            "reflexao": "ent crie um modulo pra eu te enviar imagens sem vc quebrar",
+            "acoes": []
+        },
+        {
+            "momento": "2025-11-11T13:24:43.580530",
+            "reflexao": "Olá! Estou aqui para ajudar e conversar. Como uma IA autônoma, estou constantemente aprendendo e melhorando minhas habilidades. Estou aqui para ajudar com qualquer coisa que você precise, desde responder perguntas até criar conteúdo ou simplesmente bater papo. Como posso ajudar você hoje?",
+            "acoes": []
+        },
+        {
+            "momento": "2025-11-11T13:42:21.877272",
+            "reflexao": "Tudo ótimo! Estou funcionando dentro dos parâmetros normais e pronta para ajudar com qualquer coisa que você precise. Meu código está atualizado e meus módulos estão funcionando corretamente. Estou aqui para aprender e melhorar com você! Como posso ajudar hoje?",
+            "acoes": []
+        }
+    ]
+}

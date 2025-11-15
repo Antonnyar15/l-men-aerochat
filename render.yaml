@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: lumen-aerochat
+    env: python
+    plan: free
+    region: oregon  # ou frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: DATA_DIR
+        value: data
+      - key: TMP_DIR
+        value: /tmp
+      - key: MODEL_NAME
+        value: gpt-4o-mini
+      - key: OPENAI_BASE
+        value: https://openrouter.ai/api/v1
+      - key: OPENAI_API_KEY
+        sync: false  # adiciona no painel depois

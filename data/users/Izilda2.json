@@ -1,0 +1,21 @@
+{
+    "password": "123",
+    "token": "8a67792fbea4359cb82395d2c6e23dfcc5ec90d6945dd68eea716abfe954af16",
+    "conversas": [
+        {
+            "id": "c_1763063791",
+            "titulo": "Ol\u00e1! Estou aqui para ajudar com qualquer d\u00favida ou t\u00f3pico que",
+            "mensagens": [
+                {
+                    "role": "user",
+                    "texto": "oi"
+                },
+                {
+                    "role": "ai",
+                    "texto": "Ol\u00e1! Como posso ajudar voc\u00ea hoje?"
+                }
+            ],
+            "ultimo_acesso": "2025-11-13T16:56:34.482968"
+        }
+    ]
+}

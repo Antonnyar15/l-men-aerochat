@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Lúmen – AeroChat</title>
+
+<style>
+html,body{
+  height:100%; margin:0;
+  font-family:Segoe UI,Arial;
+  background:linear-gradient(145deg,#4e6fa8,#1b2742);
+  overflow:hidden;
+}
+
+/* ---------------- AERO WINDOW ---------------- */
+.scene{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100%;
+  perspective:1200px;
+}
+
+.window{
+  width:90%; max-width:1100px;
+  height:85vh;
+  background:rgba(255,255,255,0.25);
+  border-radius:16px;
+  backdrop-filter:blur(16px);
+  box-shadow:0 8px 40px rgba(0,0,0,0.4);
+  display:flex;
+  transform:rotateX(5deg) rotateY(-3deg);
+  transition:.3s;
+  opacity:0; animation:fadeIn .8s forwards ease;
+}
+
+.window:hover{
+  transform:rotateX(2deg) rotateY(-1deg);
+}
+
+/* ---------------- SIDEBAR ---------------- */
+.sidebar{
+  width:260px;
+  background:rgba(255,255,255,0.35);
+  backdrop-filter:blur(8px);
+  border-radius:16px 0 0 16px;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  overflow-y:auto;
+}
+
+.sidebar h3{
+  margin:8px 0;
+  text-align:center;
+  color:#0b1a33;
+  font-weight:700;
+}
+
+.chat-item{
+  background:rgba(255,255,255,0.6);
+  margin:6px; padding:10px;
+  border-radius:12px;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.chat-item:hover{
+  background:#cfe0ff;
+}
+
+#logoutBtn{
+  margin-bottom:8px;
+  background:rgba(255,60,60,0.9) !important;
+  color:white !important;
+  font-weight:700;
+  text-align:center;
+  border-radius:12px;
+  padding:12px 0;
+  box-shadow:0 4px 18px rgba(0,0,0,0.25);
+}
+
+#novaConv{
+  margin-bottom:10px;
+  background:rgba(255,255,255,0.8);
+  font-weight:700;
+  text-align:center;
+  padding:12px 0;
+}
+
+/* ---------------- CHAT AREA ---------------- */
+.chat-area{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  border-radius:0 16px 16px 0;
+  overflow:hidden;
+}
+
+.titlebar{
+  background:linear-gradient(#e8f3ff,#b7d7ff);
+  padding:8px 12px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.btn{width:12px;height:12px;border-radius:50%;}
+.btn.close{background:#ff5f56;}
+.btn.min{background:#ffbd2e;}
+.btn.max{background:#27c93f;}
+
+.title{
+  margin-left:6px;
+  font-weight:600;
+  color:#0b1a33;
+}
+
+.log{
+  flex:1;
+  padding:12px;
+  overflow:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* ---------------- MENSAGENS ---------------- */
+.bubble{
+  max-width:75%;
+  padding:12px 15px;
+  border-radius:16px;
+  background:rgba(255,255,255,0.75);
+  backdrop-filter:blur(6px);
+  box-shadow:0 4px 18px rgba(0,0,0,0.25);
+}
+
+.bubble.user{
+  align-self:flex-end;
+  background:#bcd3ff;
+}
+
+/* ---- BOLHA 3D para IMAGEM ---- */
+.bubble-img{
+  padding:10px;
+  border-radius:20px;
+  background:rgba(255,255,255,0.55);
+  backdrop-filter:blur(16px);
+  box-shadow:
+    0 6px 25px rgba(0,0,0,0.35),
+    inset 0 0 22px rgba(255,255,255,0.45),
+    inset 0 0 14px rgba(160,190,255,0.3);
+  animation:pop .25s ease;
+}
+
+@keyframes pop{
+  from{transform:scale(.8);opacity:0;}
+  to{transform:scale(1);opacity:1;}
+}
+
+/* ---------------- INPUT ---------------- */
+.inputbar{
+  display:flex;
+  padding:10px;
+  background:rgba(255,255,255,0.5);
+  gap:10px;
+}
+
+/* Ícone clip */
+.clip-btn{
+  font-size:22px;
+  cursor:pointer;
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  background:rgba(255,255,255,0.65);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 18px rgba(0,0,0,0.25);
+  backdrop-filter:blur(8px);
+  transition:.2s;
+}
+.clip-btn:hover{
+  background:white;
+  transform:translateY(-2px);
+}
+
+input[type=text]{
+  flex:1;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  outline:none;
+  background:white;
+}
+
+button{
+  padding:10px 16px;
+  border:none;
+  border-radius:8px;
+  background:#3ca0ff;
+  color:white;
+  font-weight:600;
+  cursor:pointer;
+}
+
+/* ---------------- LOGIN ---------------- */
+#login{
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(27,39,66,0.7);
+  backdrop-filter:blur(20px);
+  transition:.6s;
+}
+
+#login.fadeOut{
+  opacity:0;
+  pointer-events:none;
+}
+
+.login-box{
+  background:rgba(255,255,255,0.2);
+  padding:40px;
+  width:350px;
+  border-radius:16px;
+  box-shadow:0 8px 40px rgba(0,0,0,0.4);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:14px;
+  animation:fadeInUp .8s ease;
+}
+
+#login input{
+  padding:12px;
+  width:80%;
+  border:none;
+  border-radius:8px;
+  background:rgba(255,255,255,0.85);
+  font-size:14px;
+}
+
+/* ---------------- ANIMAÇÕES ---------------- */
+@keyframes fadeInUp{
+  from{opacity:0; transform:translateY(20px);}
+  to{opacity:1; transform:translateY(0);}
+}
+
+@keyframes fadeIn{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+</style>
+</head>
+
+<body>
+<div class="scene">
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-box">
+    <h2>Lúmen – Acesso Seguro</h2>
+    <p class="subtitle">Digite seu usuário e senha</p>
+
+    <input id="username" placeholder="Usuário" type="text">
+    <input id="password" placeholder="Senha" type="password">
+
+    <div class="login-buttons" style="display:flex;gap:10px;width:100%;justify-content:center;">
+      <button onclick="entrar()">Entrar</button>
+      <button class="register" style="background:#27c93f" onclick="entrar(true)">Registrar</button>
+    </div>
+
+    <p id="loginMsg"></p>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="window" id="chatWindow" style="display:none">
+  <div class="sidebar">
+
+    <h3>Conversas</h3>
+
+    <div id="logoutBtn">Sair da conta</div>
+
+    <div id="novaConv" class="chat-item">＋ Nova conversa</div>
+
+    <div id="chatHistory"></div>
+  </div>
+
+  <div class="chat-area">
+    <div class="titlebar">
+      <div class="btn close"></div>
+      <div class="btn min"></div>
+      <div class="btn max"></div>
+      <div class="title">💬 Lúmen – AeroChat</div>
+    </div>
+
+    <div id="log" class="log"></div>
+
+    <!-- INPUT COM CLIP -->
+    <div class="inputbar">
+
+      <label for="uploadImg" class="clip-btn">📎</label>
+      <input id="uploadImg" type="file" accept="image/*" style="display:none" onchange="sendImage()">
+
+      <input id="msg" type="text" placeholder="Fale com a Lúmen...">
+      <button id="sendBtn" onclick="send()">Enviar</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+/* ============================================================
+   VARIÁVEIS
+============================================================ */
+let username = null;
+let token = null;
+let chatAtual = null;
+let esperando = false;
+
+const log = document.getElementById("log");
+const msgInput = document.getElementById("msg");
+const inputBar = document.querySelector(".inputbar");
+const chatWindow = document.getElementById("chatWindow");
+
+/* AUTO LOGIN */
+window.onload = () => {
+  const u = localStorage.getItem("lumen_user");
+  const t = localStorage.getItem("lumen_token");
+
+  if (u && t) validarSessao(u,t);
+};
+
+/* LOGIN */
+async function entrar(){
+  username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if(!username || !password){
+    loginMsg.innerText = "Preencha usuário e senha!";
+    return;
+  }
+
+  let r = await fetch("/api/login",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username,password})
+  });
+
+  let data = await r.json();
+
+  if(!r.ok){
+    loginMsg.innerText = data.detail || "Erro ao entrar";
+    return;
+  }
+
+  token = data.token;
+
+  localStorage.setItem("lumen_user", username);
+  localStorage.setItem("lumen_token", token);
+
+  iniciarChat();
+}
+
+async function validarSessao(u,t){
+  let r = await fetch("/api/validar_sessao",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username:u,token:t})
+  });
+
+  if(r.ok){
+    username = u;
+    token = t;
+    iniciarChat();
+  }
+}
+
+/* ENTRAR NO CHAT */
+function iniciarChat(){
+  document.getElementById("login").classList.add("fadeOut");
+
+  setTimeout(()=>{
+    document.getElementById("login").style.display="none";
+    chatWindow.style.display="flex";
+    carregarConversas();
+  },500);
+}
+
+/* LOGOUT */
+document.getElementById("logoutBtn").onclick = ()=>{
+  localStorage.removeItem("lumen_user");
+  localStorage.removeItem("lumen_token");
+  location.reload();
+};
+
+/* LISTAR CONVERSAS */
+async function carregarConversas(){
+  const r = await fetch("/api/conversas",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username,token})
+  });
+
+  const convs = await r.json();
+  const box = document.getElementById("chatHistory");
+  box.innerHTML = "";
+
+  if(convs.length === 0){
+    mostrarBoasVindas();
+    return;
+  }
+
+  inputBar.style.display = "flex";
+
+  abrirConversa(convs[0].id);
+
+  convs.forEach(c=>{
+    let div=document.createElement("div");
+    div.className="chat-item";
+
+    div.innerHTML = `
+      <div class='chat-title'>${c.titulo}</div>
+      <div class='chat-preview'>${c.preview||""}</div>
+    `;
+
+    div.onclick = ()=>abrirConversa(c.id);
+    box.appendChild(div);
+  });
+}
+
+/* BOAS VINDAS */
+function mostrarBoasVindas(){
+  chatAtual = null;
+  inputBar.style.display = "none";
+
+  log.innerHTML = `
+    <div style="
+      margin-top:40px;
+      text-align:center;
+      color:white;
+      font-size:22px;
+      font-weight:600;
+    ">👋 Olá, ${username}!</div>
+
+    <div style="
+      margin-top:10px;
+      text-align:center;
+      color:#dce6ff;
+      font-size:16px;
+    ">Você ainda não iniciou nenhuma conversa.<br>Vamos começar?</div>
+
+    <div style="text-align:center;margin-top:25px;">
+      <button onclick="criarPrimeiraConversa()" 
+      style="
+        background:#27c93f;
+        padding:12px 22px;
+        border:none;
+        border-radius:12px;
+        color:white;
+        font-size:16px;
+        cursor:pointer;
+        font-weight:600;
+        box-shadow:0 4px 18px rgba(0,0,0,0.25);
+      ">Iniciar conversa</button>
+    </div>
+  `;
+}
+
+async function criarPrimeiraConversa(){
+  let r = await fetch("/api/nova_conversa",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username,token})
+  });
+
+  let d = await r.json();
+  chatAtual = d.chat_id;
+
+  carregarConversas();
+}
+
+/* ABRIR CONVERSA */
+async function abrirConversa(id){
+  chatAtual = id;
+  log.innerHTML = "";
+
+  inputBar.style.display = "flex";
+
+  const r = await fetch("/api/conversa",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username,token,chat_id:id})
+  });
+
+  let msgs = await r.json();
+
+  if(msgs.length === 0){
+    addBubble("Pode mandar sua primeira mensagem!", false);
+    return;
+  }
+
+  msgs.forEach(m=>{
+    renderMensagem(m);
+  });
+
+  log.scrollTop = log.scrollHeight;
+}
+
+/* NOVA CONVERSA */
+document.getElementById("novaConv").onclick = async ()=>{
+  let r = await fetch("/api/nova_conversa",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username,token})
+  });
+
+  let d = await r.json();
+  chatAtual = d.chat_id;
+
+  log.innerHTML = "";
+  addBubble("Nova conversa iniciada!", false);
+
+  carregarConversas();
+};
+
+/* RENDER MENSAGEM */
+function renderMensagem(m){
+  if(m.texto.startsWith("[imagem:")){
+    const img = m.texto.replace("[imagem:","").replace("]","");
+    log.innerHTML += `
+      <div class="bubble-img" style="align-self:${m.role==="user"?"flex-end":"flex-start"}">
+        <img src="/uploads/${img}" 
+        style="
+          max-width:180px;
+          border-radius:16px;
+          box-shadow:0 8px 25px rgba(0,0,0,0.35);
+        ">
+      </div>
+    `;
+  } else {
+    addBubble(m.texto, m.role==="user");
+  }
+}
+
+function addBubble(text,isUser=false){
+  log.innerHTML += `<div class="bubble ${isUser?"user":""}">${text}</div>`;
+}
+
+/* ENVIAR TEXTO */
+msgInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    e.preventDefault();
+    send();
+  }
+});
+
+async function send(){
+  if(!chatAtual){
+    alert("Selecione ou crie uma conversa!");
+    return;
+  }
+
+  if(esperando) return;
+
+  let txt = msgInput.value.trim();
+  if(!txt) return;
+
+  addBubble(txt,true);
+  msgInput.value="";
+  esperando=true;
+
+  let r = await fetch("/api/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({username,token,chat_id:chatAtual,message:txt})
+  });
+
+  let d = await r.json();
+
+  addBubble(d.reply,false);
+
+  esperando=false;
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ENVIAR IMAGEM */
+async function sendImage(){
+  if(!chatAtual){
+    alert("Selecione ou crie uma conversa!");
+    return;
+  }
+
+  const file = document.getElementById("uploadImg").files[0];
+  if(!file) return;
+
+  // preview imediato
+  const reader = new FileReader();
+  reader.onload = e => {
+    log.innerHTML += `
+      <div class="bubble-img" style="align-self:flex-end">
+        <img src="${e.target.result}" style="max-width:180px;border-radius:16px;">
+      </div>`;
+    log.scrollTop = log.scrollHeight;
+  };
+  reader.readAsDataURL(file);
+
+  const form = new FormData();
+  form.append("username", username);
+  form.append("token", token);
+  form.append("chat_id", chatAtual);
+  form.append("file", file);
+
+  const r = await fetch("/api/imagem",{
+    method:"POST",
+    body: form
+  });
+
+  let d = await r.json();
+
+  addBubble(d.reply,false);
+  log.scrollTop = log.scrollHeight;
+}
+</script>
+
+</body>
+</html>
